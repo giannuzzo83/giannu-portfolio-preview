@@ -5,10 +5,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: write-all
 
 concurrency:
   group: pages
@@ -22,21 +19,18 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Ensure GitHub Pages is enabled (workflow build)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            try {
-              await github.rest.repos.getPages({ owner, repo });
-            } catch (error) {
-              if (error.status !== 404) throw error;
-              await github.rest.repos.createPagesSite({
-                owner,
-                repo,
-                build_type: 'workflow',
-              });
-            }
+      - name: Enable GitHub Pages (workflow build type)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "/repos/${GITHUB_REPOSITORY}/pages" >/dev/null 2>&1; then
+            echo "GitHub Pages already enabled"
+          else
+            gh api -X POST "/repos/${GITHUB_REPOSITORY}/pages" \
+              --input - <<< '{"build_type":"workflow"}'
+            echo "Enabled GitHub Pages with build_type=workflow"
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
